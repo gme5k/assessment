@@ -12,7 +12,7 @@ from . import views
 
 geo_list = views.GeoViewSet.as_view({
     'get': 'list',
-    'post': 'create'
+    'post': 'custom_post_action'
 })
 
 urlpatterns = format_suffix_patterns([

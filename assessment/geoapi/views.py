@@ -1,17 +1,26 @@
 from django.shortcuts import render
-from .models import GeoModel
+
 from django.contrib.gis.geos import GEOSGeometry
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django_filters import FilterSet, OrderingFilter
 from rest_framework import permissions, viewsets
 from rest_framework.views import APIView
 from rest_framework.reverse import reverse
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import GeoSerializer
-from shapely import wkt
+from rest_framework.pagination import PageNumberPagination
 
+from .models import GeoModel
+import logging
+
+
+class StdPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 10000
 
 
 def ftype_to_lookup(ftype):
@@ -73,7 +82,6 @@ def make_model_filter(model, *nested, exclude=[], **extra):
     return filterset
 
 
-
 class APIRoot(APIView):
     name = 'API Root'
     permission_classes = [permissions.IsAuthenticated]
@@ -85,11 +93,46 @@ class APIRoot(APIView):
 
 
 
+
 class GeoViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows users to be viewed or edited.
     """
     queryset = GeoModel.objects.all().order_by('timestamp')
     serializer_class = GeoSerializer
+    pagination_class = StdPagination
     permission_classes = [permissions.IsAuthenticated]
-    # filterset_class = make_model_filter(Gps , exclude=['rit'])
+    filterset_class = make_model_filter(GeoModel)
+
+    def validate(self, data):
+        """
+        Check coordinates
+        """
+        if any(
+                (data['lon'] > 180,
+                data['lon'] < -180,
+                data['lat'] > 90,
+                data['lat'] < -90)
+        ):
+            raise ValueError("invalid coords.")
+        return data
+
+    @action(detail=False, methods=['POST'])
+    def custom_post_action(self, request):
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        logger.addHandler(ch)
+        logger.info(f'REQUEST: {request}')
+        logger.info(f'REQUEST: {request.data}')
+        lon = request.data['lon']
+        lat = request.data['lat']
+        logger.info(f'TYPE {type(request.data["lon"])}')
+        data = (self.validate(request.data))
+        location=GEOSGeometry(f'SRID=4326;POINT({data["lon"]}  {data["lat"]})')
+        geo = GeoModel(location=location)
+        geo.save()
+        return Response({'message': 'Custom POST action executed successfully.'})
+
+

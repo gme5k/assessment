@@ -13,16 +13,14 @@ class GeoSerializer(serializers.ModelSerializer):
         ch = logging.StreamHandler()
         ch.setLevel(logging.INFO)
         logger.addHandler(ch)
+        logger.info(f'DATA: {data}')
+        # data = self.validate(data)
 
-        # parsing JSON doesnt work today
-        data= {'lon': 50, 'lat': 1}
-
-        logger.info(f'{data}')
-        print(len(data))
         location=GEOSGeometry(f'SRID=4326;POINT({data["lon"]}  {data["lat"]})')
         geo = GeoModel(location=location)
         geo.save()
         return geo
+
 
 
     class Meta:
